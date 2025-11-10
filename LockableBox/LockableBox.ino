@@ -107,21 +107,21 @@ void loop() {
   checkTimeout();
   
   // Custom behavior for LED during STATE_CHANGE_CONFIRM (blinking)
-  // if (currentState == STATE_CHANGE_CONFIRM) {
-  //   // Fast blinking blue for confirmation wait
-  //   if (millis() % 500 < 250) {
-  //     rgbLed.blueOn(); // Blue on
-  //   } else {
-  //     rgbLed.turnOff();   // Off
-  //   }
-  // }
+  if (currentState == STATE_CHANGE_CONFIRM) {
+    // Fast blinking blue for confirmation wait
+    if (millis() % 500 < 250) {
+      rgbLed.blueOn(); // Blue on
+    } else {
+      rgbLed.turnOff();   // Off
+    }
+  }
 
   if (resetButton.isLongPress()) {
-    // NOTE: If you only want the long press action to happen once per press 
-    // (not repeatedly while held), you would implement a flag here.
     if (resetButton.canPerformAction()) {
       Serial.println("!!! LONG PRESS DETECTED (Over 5 seconds) !!!");
       storedPin = managePin.resetToDefault();
+      rgbLed.blinkRedTimes(5);
+      rgbLed.blinkGreenTimes(2);
     }
   }
 }
@@ -157,12 +157,12 @@ String handleKey(char key) {
           transitionTo(STATE_UNLOCKED);
         } else {
           // Failure: Incorrect PIN
-          rgbLed.blinkRedTimes(3); // Flash Red 3 times
+          rgbLed.blinkRedTimes(4); // Flash Red 3 times
           transitionTo(STATE_LOCKED);
         }
       } else {
         // PIN too short, remain ready
-        rgbLed.blinkRedTimes(3); // Flash Red 3 times
+        rgbLed.blinkRedTimes(4); // Flash Red 3 times
       }
     } else if (key == '*') {
       // Check for PIN change initiation: * + [CURRENT PIN] + *
@@ -172,7 +172,7 @@ String handleKey(char key) {
           transitionTo(STATE_CHANGE_INIT_READY);
         } else {
           // Incorrect PIN for change mode
-          rgbLed.blinkRedTimes(3); // Flash Red 3 times
+          rgbLed.blinkRedTimes(4); // Flash Red 3 times
           transitionTo(STATE_LOCKED);
         }
         inputBuffer = "";
@@ -202,31 +202,22 @@ String handleKey(char key) {
           transitionTo(STATE_CHANGE_CONFIRM);
         } else if (currentState == STATE_CHANGE_CONFIRM) {
           // Second entry complete, compare with stored first entry
-          // String firstPin = String(EEPROM.read(PIN_ADDRESS), inputBuffer.length()); // This is simplified for space, usually requires a separate global temp variable
-
-          // WARNING: Direct comparison is complex without a global temp variable,
-          // so for this example, we'll use a simplified check assuming the EEPROM
-          // is temporarily storing the first attempt *or* use a fixed temp array.
-          // For a real-world application, use a global `String tempNewPin;`
           
-          if (inputBuffer.equals(changePinFirstAttempt)) { // Simplified mock check
-             // Let's assume a global String tempNewPin was used and holds the first entry
-             // if (inputBuffer.equals(tempNewPin)) {
-            
+          if (inputBuffer.equals(changePinFirstAttempt)) {
             // Success: PINs match, save new PIN
             Serial.print("saving new PIN: ");
             Serial.println(inputBuffer);
 
             String tempPin = String(inputBuffer);
             managePin.saveNewPin(inputBuffer);
-            rgbLed.blinkGreenTimes(2); // Flash Green twice
+            rgbLed.blinkGreenTimes(4); // Flash Green twice
             transitionTo(STATE_LOCKED);
             inputBuffer = ""; // Clear buffer
             return tempPin;
           } else {
             Serial.println("PIN mismatch");
             // Mismatch
-            rgbLed.blinkRedTimes(3); // Flash Red quickly
+            rgbLed.blinkRedTimes(4); // Flash Red quickly
             transitionTo(STATE_LOCKED);
             return "";
           }
@@ -234,11 +225,11 @@ String handleKey(char key) {
       } else {
         Serial.println("PIN too short/long");
         // PIN too short/long
-        rgbLed.blinkRedTimes(3); // Flash Red quickly
+        rgbLed.blinkRedTimes(4); // Flash Red quickly
         transitionTo(STATE_LOCKED);
         return "";
       }
-      inputBuffer = ""; // Clear buffer after confirmation attempt
+      inputBuffer = "";
     } else if (key == '*') {
       // Cancel/Reset buffer
       inputBuffer = "";
@@ -255,7 +246,6 @@ String handleKey(char key) {
     if (key == '*' || key == '#') {
       transitionTo(STATE_LOCKED);
     }
-    // Ignore other keys while unlocked
   }
 }
 
@@ -317,30 +307,28 @@ void transitionTo(LockState newState) {
   switch (currentState) {
     case STATE_LOCKED:
       lockControl(false);
-      rgbLed.turnOff(); // LED Off
+      rgbLed.turnOff();
       Serial.println("State: LOCKED");
       break;
     case STATE_UNLOCK_READY:
       lockControl(false);
-      rgbLed.redOn(); // Solid Red
+      rgbLed.redOn();
       Serial.println("State: UNLOCK_READY (Enter PIN)");
       break;
     case STATE_CHANGE_INIT_READY:
       lockControl(false);
       Serial.println("blue light...");
-      rgbLed.blueOn(); // Solid Blue
+      rgbLed.blueOn();
       Serial.println("State: CHANGE_INIT_READY (Enter NEW PIN)");
       break;
     case STATE_CHANGE_CONFIRM:
       lockControl(false);
-      // LED blinking is handled in loop()
       Serial.println("State: CHANGE_CONFIRM (Confirm NEW PIN)");
       break;
     case STATE_UNLOCKED:
       lockControl(true);
-      rgbLed.greenOn(); // Solid Green
+      rgbLed.greenOn();
       Serial.println("State: UNLOCKED (5s countdown)");
-      // The timeout logic in checkTimeout() will re-lock after 5s
       break;
   }
 }
